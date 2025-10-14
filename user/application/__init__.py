@@ -1,10 +1,5 @@
-from .use_cases import (
-    CreateCustomer,
-    DeleteCustomer,
-    GetCustomer,
-    ListCustomers,
-    UpdateCustomer,
-)
+from .favorite_use_cases import AddFavorite, ListFavorites, RemoveFavorite
+from .use_cases import CreateCustomer, DeleteCustomer, GetCustomer, ListCustomers, UpdateCustomer
 
 __all__ = [
     "CreateCustomer",
@@ -12,4 +7,7 @@ __all__ = [
     "GetCustomer",
     "ListCustomers",
     "UpdateCustomer",
+    "AddFavorite",
+    "ListFavorites",
+    "RemoveFavorite",
 ]

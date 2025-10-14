@@ -53,3 +53,27 @@ class Customer(AbstractUser):
 
     def __str__(self) -> str:
         return self.name
+
+
+class Favorite(models.Model):
+    """Favorite product marked by a customer."""
+
+    customer = models.ForeignKey(
+        "Customer",
+        related_name="favorites",
+        on_delete=models.CASCADE,
+    )
+    product_id = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["customer", "product_id"],
+                name="unique_customer_favorite",
+            )
+        ]
+        ordering = ("id",)
+
+    def __str__(self) -> str:
+        return f"{self.customer_id}:{self.product_id}"

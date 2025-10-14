@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Any, Dict, Optional
 
 
 @dataclass(frozen=True)
@@ -8,3 +9,16 @@ class CustomerDTO:
     id: int
     name: str
     email: str
+
+
+@dataclass(frozen=True)
+class FavoriteDTO:
+    """Transfer object for customer favorite entries."""
+
+    id: int
+    customer_id: int
+    product_id: int
+    title: Optional[str] = None
+    image: Optional[str] = None
+    price: Optional[float] = None
+    review: Optional[Dict[str, Any]] = None
