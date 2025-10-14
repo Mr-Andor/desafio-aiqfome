@@ -1,0 +1,24 @@
+name: Build and Test
+
+on:
+  pull_request:
+    branches:
+      - staging
+
+jobs:
+  build-and-test:
+    name: Build Docker image and run tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build application image
+        run: docker build -t desafio-aiqfome:${{ github.sha }} .
+
+      - name: Run Django tests inside container
+        run: docker run --rm desafio-aiqfome:${{ github.sha }} python manage.py test
