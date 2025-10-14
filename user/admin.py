@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import Customer
+from .models import Customer, Favorite
 
 
 @admin.register(Customer)
@@ -28,3 +28,12 @@ class CustomerAdmin(UserAdmin):
         ),
     )
     readonly_fields = ("date_joined", "last_login")
+
+
+@admin.register(Favorite)
+class FavoriteAdmin(admin.ModelAdmin):
+    """Admin configuration for customer favorites."""
+
+    list_display = ("customer", "product_id", "created_at")
+    search_fields = ("customer__email", "customer__name")
+    list_filter = ("product_id",)
