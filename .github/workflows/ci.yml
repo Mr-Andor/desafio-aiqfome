@@ -1,5 +1,13 @@
+name: Build and Test
+
+on:
+  pull_request:
+    branches:
+      - staging
+
 jobs:
   build-and-test:
+    name: Build Docker image and run tests
     runs-on: ubuntu-latest
     services:
       postgres:
