@@ -1,9 +1,10 @@
-import base64
 import json
 from unittest.mock import patch
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from user.application import CreateCustomer
 from user.infrastructure.repositories import DjangoCustomerRepository
@@ -17,10 +18,11 @@ class FavoriteAPITests(TestCase):
             email="fjord@conclave.example",
             password=self.password,
         )
+        self.customer_model = get_user_model().objects.get(pk=self.customer.id)
 
     def _auth_headers(self):
-        token = base64.b64encode(f"{self.customer.email}:{self.password}".encode("utf-8")).decode("utf-8")
-        return {"HTTP_AUTHORIZATION": f"Basic {token}"}
+        access_token = RefreshToken.for_user(self.customer_model).access_token
+        return {"HTTP_AUTHORIZATION": f"Bearer {access_token}"}
 
     @patch("user.interfaces.views.FakeStoreProductGateway.exists", return_value=True)
     def test_add_favorite_returns_201(self, exists_mock):

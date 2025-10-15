@@ -1,9 +1,9 @@
-import base64
 import json
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from user.application.use_cases import CreateCustomer
 from user.infrastructure.repositories import DjangoCustomerRepository
@@ -14,18 +14,16 @@ class CustomerAPITests(TestCase):
         self.repository = DjangoCustomerRepository()
         self.factory_create = CreateCustomer(self.repository)
 
-        self.staff_email = "volo@waterdeep.example"
-        self.staff_password = "volobook123"
-        get_user_model().objects.create_user(
+        self.staff_user = get_user_model().objects.create_user(
             name="Volo Geddarm",
-            email=self.staff_email,
-            password=self.staff_password,
+            email="volo@waterdeep.example",
+            password="volobook123",
             is_staff=True,
         )
 
-    def _auth_headers(self, email: str, password: str):
-        token = base64.b64encode(f"{email}:{password}".encode("utf-8")).decode("utf-8")
-        return {"HTTP_AUTHORIZATION": f"Basic {token}"}
+    def _auth_headers(self, user):
+        access_token = RefreshToken.for_user(user).access_token
+        return {"HTTP_AUTHORIZATION": f"Bearer {access_token}"}
 
     def test_create_customer_returns_201(self):
         payload = {
@@ -65,7 +63,7 @@ class CustomerAPITests(TestCase):
 
         response = self.client.get(
             reverse("user-list"),
-            **self._auth_headers(self.staff_email, self.staff_password),
+            **self._auth_headers(self.staff_user),
         )
 
         self.assertEqual(response.status_code, 200)
@@ -93,10 +91,11 @@ class CustomerAPITests(TestCase):
             email="pike@voxmachina.example",
             password=customer_password,
         )
+        customer_model = get_user_model().objects.get(pk=customer.id)
 
         response = self.client.get(
             reverse("user-detail", args=[customer.id]),
-            **self._auth_headers(customer.email, customer_password),
+            **self._auth_headers(customer_model),
         )
 
         self.assertEqual(response.status_code, 200)
@@ -127,6 +126,7 @@ class CustomerAPITests(TestCase):
             email="grog@voxmachina.example",
             password=customer_password,
         )
+        customer_model = get_user_model().objects.get(pk=customer.id)
 
         payload = {"name": "Grog Strongjaw", "email": "grog@herdstone.example"}
 
@@ -134,7 +134,7 @@ class CustomerAPITests(TestCase):
             reverse("user-detail", args=[customer.id]),
             data=json.dumps(payload),
             content_type="application/json",
-            **self._auth_headers(customer.email, customer_password),
+            **self._auth_headers(customer_model),
         )
 
         self.assertEqual(response.status_code, 200)
@@ -159,10 +159,11 @@ class CustomerAPITests(TestCase):
             email="vex@voxmachina.example",
             password=customer_password,
         )
+        customer_model = get_user_model().objects.get(pk=customer.id)
 
         response = self.client.delete(
             reverse("user-detail", args=[customer.id]),
-            **self._auth_headers(customer.email, customer_password),
+            **self._auth_headers(customer_model),
         )
 
         self.assertEqual(response.status_code, 204)
