@@ -1,5 +1,9 @@
 # desafio-aiqfome
 
+## Justificativas
+
+Para não poluir o guia de instalação e execução optei por deixar a justificava das escolhas de arquitetura dentro de um documento separado denominado "Justificativas" na pasta raiz do projeto.
+
 ## Instalação com Docker
 
 1. **Copie o arquivo de ambiente**
