@@ -1,5 +1,4 @@
-name: CI (Poetry + Postgres service)
-
+name: CI
 on: [push, pull_request]
 
 jobs:
@@ -13,6 +12,8 @@ jobs:
           POSTGRES_USER: Gandalf
           POSTGRES_PASSWORD: Mellon
           POSTGRES_DB: desafio_aiqfome
+        ports:
+          - 5432:5432
         options: >-
           --health-cmd="pg_isready -U Gandalf"
           --health-interval=10s --health-timeout=5s --health-retries=10
@@ -42,14 +43,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-client
 
-      - name: Get mapped Postgres host port and wait for Postgres to be ready
+      - name: Wait for Postgres to be ready
         env:
           POSTGRES_USER: Gandalf
-          PG_PORT: ${{ job.services.postgres.ports[5432] }}
         run: |
-          echo "Mapped PG port: $PG_PORT"
-          until pg_isready -h 127.0.0.1 -p "$PG_PORT" -U "$POSTGRES_USER"; do
-            echo "waiting for postgres on 127.0.0.1:$PG_PORT..."
+          until pg_isready -h 127.0.0.1 -p 5432 -U "$POSTGRES_USER"; do
+            echo "waiting for postgres on 127.0.0.1:5432..."
             sleep 1
           done
 
@@ -59,6 +58,6 @@ jobs:
           DB_USER: Gandalf
           DB_PASSWORD: Mellon
           DB_HOST: 127.0.0.1
-          DB_PORT: ${{ job.services.postgres.ports[5432] }}
+          DB_PORT: 5432
         run: |
           poetry run python manage.py test
