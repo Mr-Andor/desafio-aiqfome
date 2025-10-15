@@ -23,7 +23,7 @@ class FakeStoreProductGateway(ProductGateway):
         req = request.Request(url, method="GET")
 
         try:
-            with request.urlopen(req, timeout=5) as response:  # nosec B310 - trusted external dependency
+            with request.urlopen(req, timeout=5) as response:
                 if response.status != 200:
                     return None
                 payload = json.loads(response.read().decode("utf-8"))
