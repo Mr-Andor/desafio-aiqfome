@@ -42,12 +42,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-client
 
-      - name: Wait for Postgres to be ready
+      - name: Get mapped Postgres host port and wait for Postgres to be ready
         env:
           POSTGRES_USER: Gandalf
+          PG_PORT: ${{ job.services.postgres.ports[5432] }}
         run: |
-          until pg_isready -h localhost -p 5432 -U "$POSTGRES_USER"; do
-            echo "waiting for postgres..."
+          echo "Mapped PG port: $PG_PORT"
+          until pg_isready -h 127.0.0.1 -p "$PG_PORT" -U "$POSTGRES_USER"; do
+            echo "waiting for postgres on 127.0.0.1:$PG_PORT..."
             sleep 1
           done
 
@@ -56,7 +58,7 @@ jobs:
           DB_NAME: desafio_aiqfome
           DB_USER: Gandalf
           DB_PASSWORD: Mellon
-          DB_HOST: localhost
-          DB_PORT: 5432
+          DB_HOST: 127.0.0.1
+          DB_PORT: ${{ job.services.postgres.ports[5432] }}
         run: |
           poetry run python manage.py test
