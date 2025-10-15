@@ -11,8 +11,8 @@ class CreateCustomer:
     def __init__(self, repository: CustomerRepository):
         self._repository = repository
 
-    def execute(self, *, name: str, email: str) -> CustomerDTO:
-        return self._repository.create(name=name, email=email)
+    def execute(self, *, name: str, email: str, password: str) -> CustomerDTO:
+        return self._repository.create(name=name, email=email, password=password)
 
 
 class ListCustomers:

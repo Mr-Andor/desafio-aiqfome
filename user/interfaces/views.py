@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import base64
+import binascii
 import json
 from dataclasses import asdict
 from typing import Any, Dict
 
+from django.contrib.auth import authenticate
 from django.db import IntegrityError
 from django.http import HttpResponse, JsonResponse
 from django.utils.decorators import method_decorator
@@ -51,25 +54,94 @@ class _JSONViewMixin:
         return JsonResponse(response_data, status=status)
 
 
-class _CustomerBaseView(_JSONViewMixin, View):
+class _BasicAuthMixin(_JSONViewMixin):
+    """Mixin implementing HTTP Basic authentication for class-based views."""
+
+    auth_optional_methods: frozenset[str] | set[str] = frozenset()
+    auth_realm = "api"
+
+    def dispatch(self, request, *args, **kwargs):
+        method = request.method.lower()
+        requires_auth = method not in self.auth_optional_methods
+
+        if requires_auth:
+            user, error_message = self._authenticate_request(request)
+            if user is None:
+                return self._unauthorized_response(error_message)
+
+            if not self._authorize_request(user, request, *args, **kwargs):
+                return self._forbidden_response()
+
+            request.user = user
+
+        return super().dispatch(request, *args, **kwargs)
+
+    def _authenticate_request(self, request):
+        header = request.META.get("HTTP_AUTHORIZATION", "")
+        if not header:
+            return None, "Authentication credentials were not provided."
+
+        parts = header.split(" ", 1)
+        if len(parts) != 2 or parts[0].lower() != "basic":
+            return None, "Invalid authentication header."
+
+        encoded_credentials = parts[1]
+        try:
+            decoded_credentials = base64.b64decode(encoded_credentials).decode("utf-8")
+        except (binascii.Error, UnicodeDecodeError, ValueError):
+            return None, "Invalid authentication header."
+
+        if ":" not in decoded_credentials:
+            return None, "Invalid authentication header."
+
+        username, password = decoded_credentials.split(":", 1)
+        user = authenticate(request, username=username, password=password)
+        if user is None:
+            return None, "Invalid username/password."
+
+        return user, None
+
+    def _authorize_request(self, user, request, *args, **kwargs):
+        return True
+
+    def _unauthorized_response(self, message: str):
+        response = self._error_response(message=message, status=401)
+        response["WWW-Authenticate"] = f'Basic realm="{self.auth_realm}"'
+        return response
+
+    def _forbidden_response(self):
+        return self._error_response(
+            message="You do not have permission to perform this action.",
+            status=403,
+        )
+
+
+class _CustomerBaseView(_BasicAuthMixin, View):
     repository_class = DjangoCustomerRepository
 
     def dispatch(self, request, *args, **kwargs):
         self.repository = self.repository_class()
         return super().dispatch(request, *args, **kwargs)
 
-    def _validate_payload(self, payload: Dict[str, Any]) -> Dict[str, str]:
+    def _validate_payload(self, payload: Dict[str, Any], *, require_password: bool = False) -> Dict[str, str]:
         errors: Dict[str, str] = {}
         if not payload.get("name"):
             errors["name"] = "This field is required."
         if not payload.get("email"):
             errors["email"] = "This field is required."
+        if require_password and not payload.get("password"):
+            errors["password"] = "This field is required."
         return errors
 
 
 @method_decorator(csrf_exempt, name="dispatch")
 class CustomerListCreateView(_CustomerBaseView):
     """Entrypoint for listing and creating customers."""
+
+    auth_optional_methods = {"post"}
+
+    def _authorize_request(self, user, request, *args, **kwargs):
+        return user.is_staff
 
     def get(self, request):
         customers = ListCustomers(self.repository).execute()
@@ -82,7 +154,7 @@ class CustomerListCreateView(_CustomerBaseView):
         except ValueError:
             return self._error_response(message="Invalid JSON payload.", status=400)
 
-        errors = self._validate_payload(payload)
+        errors = self._validate_payload(payload, require_password=True)
         if errors:
             return self._error_response(message="Invalid payload.", status=400, details=errors)
 
@@ -90,6 +162,7 @@ class CustomerListCreateView(_CustomerBaseView):
             customer = CreateCustomer(self.repository).execute(
                 name=payload["name"],
                 email=payload["email"],
+                password=payload["password"],
             )
         except IntegrityError:
             return self._error_response(
@@ -104,6 +177,10 @@ class CustomerListCreateView(_CustomerBaseView):
 @method_decorator(csrf_exempt, name="dispatch")
 class CustomerDetailView(_CustomerBaseView):
     """Entrypoint for retrieving, updating, and deleting customers."""
+
+    def _authorize_request(self, user, request, *args, **kwargs):
+        customer_id = kwargs.get("customer_id")
+        return user.is_staff or user.id == customer_id
 
     def get(self, request, customer_id: int):
         try:
@@ -149,7 +226,7 @@ class CustomerDetailView(_CustomerBaseView):
         return HttpResponse(status=204)
 
 
-class _FavoriteBaseView(_JSONViewMixin, View):
+class _FavoriteBaseView(_BasicAuthMixin, View):
     repository_class = DjangoFavoriteRepository
     product_gateway_class = FakeStoreProductGateway
 
@@ -157,6 +234,10 @@ class _FavoriteBaseView(_JSONViewMixin, View):
         self.repository = self.repository_class()
         self.product_gateway = self.product_gateway_class()
         return super().dispatch(request, *args, **kwargs)
+
+    def _authorize_request(self, user, request, *args, **kwargs):
+        customer_id = kwargs.get("customer_id")
+        return user.is_staff or user.id == customer_id
 
     def _validate_payload(self, payload: Dict[str, Any]) -> Dict[str, str]:
         errors: Dict[str, str] = {}

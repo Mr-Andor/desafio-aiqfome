@@ -25,15 +25,16 @@ class FavoriteUseCaseTests(TestCase):
         self.product_gateway = StubProductGateway(
             existing_ids={1, 2, 3},
             details={
-                1: {"title": "Lightsaber", "image": "saber.png", "price": 199.99, "review": {"rate": 5}},
-                2: {"title": "Holocron", "image": "holo.png", "price": 49.5, "review": {"rate": 4.5}},
-                3: {"title": "Pilot Helmet", "image": "helmet.png", "price": 120.0, "review": None},
+                1: {"title": "Vorpal Sword", "image": "vorpal_sword.png", "price": 199.99, "review": {"rate": 5}},
+                2: {"title": "Deck of Many Things", "image": "deck.png", "price": 49.5, "review": {"rate": 4.5}},
+                3: {"title": "Bag of Holding", "image": "bag.png", "price": 120.0, "review": None},
             },
         )
 
         self.customer = CreateCustomer(self.customer_repo).execute(
-            name="Ahsoka Tano",
-            email="ahsoka@togruta.example",
+            name="Mordenkainen",
+            email="mordenkainen@greyhawk.example",
+            password="wizard123",
         )
 
     def test_add_favorite_persists_product(self):
@@ -69,8 +70,8 @@ class FavoriteUseCaseTests(TestCase):
 
         self.assertEqual({fav.product_id for fav in favorites}, {1, 2})
         favorite = next(fav for fav in favorites if fav.product_id == 1)
-        self.assertEqual(favorite.title, "Lightsaber")
-        self.assertEqual(favorite.image, "saber.png")
+        self.assertEqual(favorite.title, "Vorpal Sword")
+        self.assertEqual(favorite.image, "vorpal_sword.png")
         self.assertEqual(favorite.price, 199.99)
         self.assertEqual(favorite.review, {"rate": 5})
 
