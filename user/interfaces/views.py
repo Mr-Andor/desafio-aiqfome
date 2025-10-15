@@ -1,17 +1,22 @@
 from __future__ import annotations
 
-import base64
-import binascii
-import json
+from collections.abc import Mapping
 from dataclasses import asdict
 from typing import Any, Dict
 
-from django.contrib.auth import authenticate
 from django.db import IntegrityError
-from django.http import HttpResponse, JsonResponse
-from django.utils.decorators import method_decorator
-from django.views import View
-from django.views.decorators.csrf import csrf_exempt
+
+from drf_spectacular.utils import OpenApiResponse, extend_schema
+from rest_framework.exceptions import (
+    AuthenticationFailed,
+    NotAuthenticated,
+    ParseError,
+    PermissionDenied,
+)
+from rest_framework.permissions import AllowAny, BasePermission, IsAdminUser, IsAuthenticated
+from rest_framework.request import Request
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from user.application import (
     AddFavorite,
@@ -35,134 +40,136 @@ from user.infrastructure import (
     DjangoFavoriteRepository,
     FakeStoreProductGateway,
 )
+from user.interfaces.serializers import (
+    CustomerCreateInputSerializer,
+    CustomerInputSerializer,
+    CustomerOutputSerializer,
+    FavoriteCreateSerializer,
+    FavoriteOutputSerializer,
+)
 
 
 class _JSONViewMixin:
-    def _load_payload(self, request) -> Dict[str, Any]:
-        if not request.body:
-            return {}
-
+    def _load_payload(self, request: Request) -> Dict[str, Any]:
         try:
-            return json.loads(request.body.decode("utf-8"))
-        except json.JSONDecodeError as exc:
+            data = request.data
+        except ParseError as exc:
             raise ValueError("Invalid JSON payload") from exc
+        if data is None:
+            return {}
+        if isinstance(data, Mapping):
+            return dict(data)
+        return data
 
-    def _error_response(self, *, message: str, status: int, details: Dict[str, Any] | None = None):
+    def _error_response(
+        self,
+        *,
+        message: str,
+        status: int,
+        details: Dict[str, Any] | None = None,
+    ) -> Response:
         response_data = {"error": message}
         if details:
             response_data["details"] = details
-        return JsonResponse(response_data, status=status)
+        return Response(response_data, status=status)
 
-
-class _BasicAuthMixin(_JSONViewMixin):
-    """Mixin implementing HTTP Basic authentication for class-based views."""
-
-    auth_optional_methods: frozenset[str] | set[str] = frozenset()
-    auth_realm = "api"
-
-    def dispatch(self, request, *args, **kwargs):
-        method = request.method.lower()
-        requires_auth = method not in self.auth_optional_methods
-
-        if requires_auth:
-            user, error_message = self._authenticate_request(request)
-            if user is None:
-                return self._unauthorized_response(error_message)
-
-            if not self._authorize_request(user, request, *args, **kwargs):
-                return self._forbidden_response()
-
-            request.user = user
-
-        return super().dispatch(request, *args, **kwargs)
-
-    def _authenticate_request(self, request):
-        header = request.META.get("HTTP_AUTHORIZATION", "")
-        if not header:
-            return None, "Authentication credentials were not provided."
-
-        parts = header.split(" ", 1)
-        if len(parts) != 2 or parts[0].lower() != "basic":
-            return None, "Invalid authentication header."
-
-        encoded_credentials = parts[1]
-        try:
-            decoded_credentials = base64.b64decode(encoded_credentials).decode("utf-8")
-        except (binascii.Error, UnicodeDecodeError, ValueError):
-            return None, "Invalid authentication header."
-
-        if ":" not in decoded_credentials:
-            return None, "Invalid authentication header."
-
-        username, password = decoded_credentials.split(":", 1)
-        user = authenticate(request, username=username, password=password)
-        if user is None:
-            return None, "Invalid username/password."
-
-        return user, None
-
-    def _authorize_request(self, user, request, *args, **kwargs):
-        return True
-
-    def _unauthorized_response(self, message: str):
-        response = self._error_response(message=message, status=401)
-        response["WWW-Authenticate"] = f'Basic realm="{self.auth_realm}"'
-        return response
-
-    def _forbidden_response(self):
+    def _forbidden_response(self) -> Response:
         return self._error_response(
             message="You do not have permission to perform this action.",
             status=403,
         )
 
 
-class _CustomerBaseView(_BasicAuthMixin, View):
+class _BaseAPIView(_JSONViewMixin, APIView):
+    """Base API view providing consistent error handling for auth failures."""
+
+    www_authenticate_header = "Bearer"
+
+    def handle_exception(self, exc):
+        if isinstance(exc, (AuthenticationFailed, NotAuthenticated)):
+            response = self._error_response(message=str(exc.detail), status=401)
+            response["WWW-Authenticate"] = getattr(exc, "auth_header", None) or self.www_authenticate_header
+            return response
+
+        if isinstance(exc, PermissionDenied):
+            return self._forbidden_response()
+
+        return super().handle_exception(exc)
+
+
+class IsStaffOrTargetCustomer(BasePermission):
+    """Allow access to staff users or to the customer matching the route."""
+
+    message = "You do not have permission to perform this action."
+
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+
+        customer_id = view.kwargs.get("customer_id")
+        if customer_id is None:
+            return user.is_staff
+
+        return user.is_staff or user.id == customer_id
+
+
+class _CustomerBaseView(_BaseAPIView):
     repository_class = DjangoCustomerRepository
 
     def dispatch(self, request, *args, **kwargs):
         self.repository = self.repository_class()
         return super().dispatch(request, *args, **kwargs)
 
-    def _validate_payload(self, payload: Dict[str, Any], *, require_password: bool = False) -> Dict[str, str]:
-        errors: Dict[str, str] = {}
-        if not payload.get("name"):
-            errors["name"] = "This field is required."
-        if not payload.get("email"):
-            errors["email"] = "This field is required."
-        if require_password and not payload.get("password"):
-            errors["password"] = "This field is required."
-        return errors
 
-
-@method_decorator(csrf_exempt, name="dispatch")
 class CustomerListCreateView(_CustomerBaseView):
     """Entrypoint for listing and creating customers."""
 
-    auth_optional_methods = {"post"}
+    def get_permissions(self):
+        if self.request.method.lower() == "post":
+            return [AllowAny()]
+        return [IsAuthenticated(), IsAdminUser()]
 
-    def _authorize_request(self, user, request, *args, **kwargs):
-        return user.is_staff
-
-    def get(self, request):
+    @extend_schema(
+        summary="List customers",
+        description="Return all registered customers. Requires staff credentials.",
+        responses={200: CustomerOutputSerializer(many=True)},
+        auth=[{'BearerAuth': []}],
+    )
+    def get(self, request: Request):
         customers = ListCustomers(self.repository).execute()
         data = [asdict(customer) for customer in customers]
-        return JsonResponse(data, status=200, safe=False)
+        return Response(data, status=200)
 
-    def post(self, request):
+    @extend_schema(
+        summary="Create customer",
+        description="Register a new customer. Authentication is optional for this action.",
+        request=CustomerCreateInputSerializer,
+        responses={
+            201: CustomerOutputSerializer,
+            400: OpenApiResponse(description="Invalid payload or duplicated email."),
+        },
+        auth=[],
+    )
+    def post(self, request: Request):
         try:
             payload = self._load_payload(request)
         except ValueError:
             return self._error_response(message="Invalid JSON payload.", status=400)
 
-        errors = self._validate_payload(payload, require_password=True)
-        if errors:
-            return self._error_response(message="Invalid payload.", status=400, details=errors)
+        serializer = CustomerCreateInputSerializer(data=payload)
+        if not serializer.is_valid():
+            return self._error_response(
+                message="Invalid payload.",
+                status=400,
+                details=serializer.errors,
+            )
 
         try:
             customer = CreateCustomer(self.repository).execute(
-                name=payload["name"],
-                email=payload["email"],
-                password=payload["password"],
+                name=serializer.validated_data["name"],
+                email=serializer.validated_data["email"],
+                password=serializer.validated_data["password"],
             )
         except IntegrityError:
             return self._error_response(
@@ -171,40 +178,59 @@ class CustomerListCreateView(_CustomerBaseView):
                 details={"email": "Must be unique."},
             )
 
-        return JsonResponse(asdict(customer), status=201)
+        return Response(asdict(customer), status=201)
 
 
-@method_decorator(csrf_exempt, name="dispatch")
 class CustomerDetailView(_CustomerBaseView):
     """Entrypoint for retrieving, updating, and deleting customers."""
 
-    def _authorize_request(self, user, request, *args, **kwargs):
-        customer_id = kwargs.get("customer_id")
-        return user.is_staff or user.id == customer_id
+    permission_classes = [IsAuthenticated, IsStaffOrTargetCustomer]
 
-    def get(self, request, customer_id: int):
+    @extend_schema(
+        summary="Retrieve customer",
+        responses={
+            200: CustomerOutputSerializer,
+            404: OpenApiResponse(description="Customer not found."),
+        },
+        auth=[{'BearerAuth': []}],
+    )
+    def get(self, request: Request, customer_id: int):
         try:
             customer = GetCustomer(self.repository).execute(customer_id)
         except CustomerNotFoundError:
             return self._error_response(message="Customer not found.", status=404)
 
-        return JsonResponse(asdict(customer), status=200)
+        return Response(asdict(customer), status=200)
 
-    def put(self, request, customer_id: int):
+    @extend_schema(
+        summary="Update customer",
+        request=CustomerInputSerializer,
+        responses={
+            200: CustomerOutputSerializer,
+            400: OpenApiResponse(description="Invalid payload or duplicated email."),
+            404: OpenApiResponse(description="Customer not found."),
+        },
+        auth=[{'BearerAuth': []}],
+    )
+    def put(self, request: Request, customer_id: int):
         try:
             payload = self._load_payload(request)
         except ValueError:
             return self._error_response(message="Invalid JSON payload.", status=400)
 
-        errors = self._validate_payload(payload)
-        if errors:
-            return self._error_response(message="Invalid payload.", status=400, details=errors)
+        serializer = CustomerInputSerializer(data=payload)
+        if not serializer.is_valid():
+            return self._error_response(
+                message="Invalid payload.",
+                status=400,
+                details=serializer.errors,
+            )
 
         try:
             customer = UpdateCustomer(self.repository).execute(
                 customer_id=customer_id,
-                name=payload["name"],
-                email=payload["email"],
+                name=serializer.validated_data["name"],
+                email=serializer.validated_data["email"],
             )
         except CustomerNotFoundError:
             return self._error_response(message="Customer not found.", status=404)
@@ -215,18 +241,26 @@ class CustomerDetailView(_CustomerBaseView):
                 details={"email": "Must be unique."},
             )
 
-        return JsonResponse(asdict(customer), status=200)
+        return Response(asdict(customer), status=200)
 
-    def delete(self, request, customer_id: int):
+    @extend_schema(
+        summary="Delete customer",
+        responses={
+            204: OpenApiResponse(description="Customer removed."),
+            404: OpenApiResponse(description="Customer not found."),
+        },
+        auth=[{'BearerAuth': []}],
+    )
+    def delete(self, request: Request, customer_id: int):
         try:
             DeleteCustomer(self.repository).execute(customer_id=customer_id)
         except CustomerNotFoundError:
             return self._error_response(message="Customer not found.", status=404)
 
-        return HttpResponse(status=204)
+        return Response(status=204)
 
 
-class _FavoriteBaseView(_BasicAuthMixin, View):
+class _FavoriteBaseView(_BaseAPIView):
     repository_class = DjangoFavoriteRepository
     product_gateway_class = FakeStoreProductGateway
 
@@ -235,34 +269,22 @@ class _FavoriteBaseView(_BasicAuthMixin, View):
         self.product_gateway = self.product_gateway_class()
         return super().dispatch(request, *args, **kwargs)
 
-    def _authorize_request(self, user, request, *args, **kwargs):
-        customer_id = kwargs.get("customer_id")
-        return user.is_staff or user.id == customer_id
-
-    def _validate_payload(self, payload: Dict[str, Any]) -> Dict[str, str]:
-        errors: Dict[str, str] = {}
-        if "product_id" not in payload:
-            errors["product_id"] = "This field is required."
-            return errors
-
-        try:
-            product_id = int(payload["product_id"])
-        except (TypeError, ValueError):
-            errors["product_id"] = "Must be an integer."
-            return errors
-
-        if product_id <= 0:
-            errors["product_id"] = "Must be a positive integer."
-
-        payload["product_id"] = product_id
-        return errors
-
-
-@method_decorator(csrf_exempt, name="dispatch")
 class FavoriteListCreateView(_FavoriteBaseView):
     """List and add favorites for a specific customer."""
 
-    def get(self, request, customer_id: int):
+    permission_classes = [IsAuthenticated, IsStaffOrTargetCustomer]
+
+    @extend_schema(
+        summary="List favorites",
+        description="Return the favorite products stored for the given customer.",
+        responses={
+            200: FavoriteOutputSerializer(many=True),
+            404: OpenApiResponse(description="Customer not found."),
+            503: OpenApiResponse(description="External product service unavailable."),
+        },
+        auth=[{'BearerAuth': []}],
+    )
+    def get(self, request: Request, customer_id: int):
         try:
             favorites = ListFavorites(self.repository, self.product_gateway).execute(
                 customer_id=customer_id
@@ -276,19 +298,34 @@ class FavoriteListCreateView(_FavoriteBaseView):
             )
 
         data = [asdict(favorite) for favorite in favorites]
-        return JsonResponse(data, status=200, safe=False)
+        return Response(data, status=200)
 
-    def post(self, request, customer_id: int):
+    @extend_schema(
+        summary="Add favorite",
+        request=FavoriteCreateSerializer,
+        responses={
+            201: FavoriteOutputSerializer,
+            400: OpenApiResponse(description="Invalid payload or favorite already registered."),
+            404: OpenApiResponse(description="Customer or product not found."),
+            503: OpenApiResponse(description="External product service unavailable."),
+        },
+        auth=[{'BearerAuth': []}],
+    )
+    def post(self, request: Request, customer_id: int):
         try:
             payload = self._load_payload(request)
         except ValueError:
             return self._error_response(message="Invalid JSON payload.", status=400)
 
-        errors = self._validate_payload(payload)
-        if errors:
-            return self._error_response(message="Invalid payload.", status=400, details=errors)
+        serializer = FavoriteCreateSerializer(data=payload)
+        if not serializer.is_valid():
+            return self._error_response(
+                message="Invalid payload.",
+                status=400,
+                details=serializer.errors,
+            )
 
-        product_id = payload["product_id"]
+        product_id = serializer.validated_data["product_id"]
 
         try:
             favorite = AddFavorite(self.repository, self.product_gateway).execute(
@@ -310,14 +347,23 @@ class FavoriteListCreateView(_FavoriteBaseView):
                 status=503,
             )
 
-        return JsonResponse(asdict(favorite), status=201)
+        return Response(asdict(favorite), status=201)
 
 
-@method_decorator(csrf_exempt, name="dispatch")
 class FavoriteDetailView(_FavoriteBaseView):
     """Remove a favorite product from a customer."""
 
-    def delete(self, request, customer_id: int, product_id: int):
+    permission_classes = [IsAuthenticated, IsStaffOrTargetCustomer]
+
+    @extend_schema(
+        summary="Remove favorite",
+        responses={
+            204: OpenApiResponse(description="Favorite removed."),
+            404: OpenApiResponse(description="Favorite not found."),
+        },
+        auth=[{'BearerAuth': []}],
+    )
+    def delete(self, request: Request, customer_id: int, product_id: int):
         try:
             RemoveFavorite(self.repository).execute(
                 customer_id=customer_id,
@@ -326,4 +372,4 @@ class FavoriteDetailView(_FavoriteBaseView):
         except (CustomerNotFoundError, FavoriteNotFoundError):
             return self._error_response(message="Favorite not found.", status=404)
 
-        return HttpResponse(status=204)
+        return Response(status=204)
