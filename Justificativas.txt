@@ -3,6 +3,11 @@ Escolhi partir de uma estrutura de clean architecture considerando que, na descr
 foi mencionado a necessidade do sistema desenvolvido se integrado a outros sistemas internos e externos. Essa necessidade funcional
 sugere que ele precise ser escalável, modular e padronizado.
 
+Por que o código está em inglês?
+Padronização. Algumas bibliotecas podem ter problemas com caracteres especiais de português, a línguagem da sintaxe das linguagens já é feita em inglês,
+e, além disso, não tem como saber que pessoas irão realizar manutenção de código. Em um ambiente de cooperação internacional acho importante manter tudo na lingua franca
+que outros desenvolvedores provavelmente já conhecem. 
+
 Partir de uma abordagem mais "pythonesca" utilizando o modelo MTV, mais comum em Django, poderia ter sido mais simples mas eu acredito que uma abordagem
 mais centrada no DDD acaba criando um produto mais estável e modular. Durante o desenvolvimento eu me coloquei no papel de um desenvolvedor que está
 integrando este sistema de forma de longo-prazo dentro de uma aplicação corporativa maior. Em um caso como esse penso
