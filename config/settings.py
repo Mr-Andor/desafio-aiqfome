@@ -30,7 +30,13 @@ SECRET_KEY = 'django-insecure-7%j+199y%b3)pvf2hl4^x^_o+eqe@p_^vit0jf*qz@e99u#j=)
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+raw_allowed_hosts = os.environ.get('DJANGO_ALLOWED_HOSTS', '')
+if raw_allowed_hosts:
+    ALLOWED_HOSTS = [host.strip() for host in raw_allowed_hosts.split(',') if host.strip()]
+else:
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+    if DEBUG:
+        ALLOWED_HOSTS.append('0.0.0.0')
 
 
 # Application definition
