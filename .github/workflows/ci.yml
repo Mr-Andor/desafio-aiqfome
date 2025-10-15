@@ -1,24 +1,63 @@
-name: Build and Test
-
-on:
-  pull_request:
-    branches:
-      - staging
+name: CI
+on: [push, pull_request]
 
 jobs:
-  build-and-test:
-    name: Build Docker image and run tests
+  test:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: Gandalf
+          POSTGRES_PASSWORD: Mellon
+          POSTGRES_DB: desafio_aiqfome
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U Gandalf"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
 
-      - name: Build application image
-        run: docker build -t desafio-aiqfome:${{ github.sha }} .
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Run Django tests inside container
-        run: docker run --rm desafio-aiqfome:${{ github.sha }} python manage.py test
+      - name: Configure poetry and install deps
+        env:
+          POETRY_VIRTUALENVS_IN_PROJECT: "true"
+        run: |
+          poetry config virtualenvs.in-project true
+          poetry install --no-interaction --no-ansi --no-root
+
+      - name: Install pg_isready (postgres client) for wait loop
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Wait for Postgres to be ready
+        env:
+          POSTGRES_USER: Gandalf
+        run: |
+          until pg_isready -h 127.0.0.1 -p 5432 -U "$POSTGRES_USER"; do
+            echo "waiting for postgres on 127.0.0.1:5432..."
+            sleep 1
+          done
+
+      - name: Run Django tests (via Poetry)
+        env:
+          DB_NAME: desafio_aiqfome
+          DB_USER: Gandalf
+          DB_PASSWORD: Mellon
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+        run: |
+          poetry run python manage.py test
