@@ -3,12 +3,17 @@ from typing import Any, Dict, Optional
 
 
 @dataclass(frozen=True)
-class CustomerDTO:
-    """Immutable transfer object for exposing customer data."""
+class UserDTO:
+    """Immutable transfer object for exposing common user data."""
 
     id: int
     name: str
     email: str
+
+
+@dataclass(frozen=True)
+class CustomerDTO(UserDTO):
+    """Immutable transfer object for exposing customer data."""
 
 
 @dataclass(frozen=True)

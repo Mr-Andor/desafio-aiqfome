@@ -12,6 +12,8 @@ class CustomerManager(BaseUserManager):
             raise ValueError("An email address must be provided")
         if not name:
             raise ValueError("A name must be provided")
+        if not password:
+            raise ValueError("A password must be provided")
 
         email = self.normalize_email(email)
         user = self.model(email=email, name=name, **extra_fields)
@@ -19,7 +21,7 @@ class CustomerManager(BaseUserManager):
         user.save(using=self._db)
         return user
 
-    def create_user(self, email, name, password=None, **extra_fields):
+    def create_user(self, email, name, password, **extra_fields):
         extra_fields.setdefault("is_staff", False)
         extra_fields.setdefault("is_superuser", False)
         return self._create_user(email, name, password, **extra_fields)
@@ -36,8 +38,8 @@ class CustomerManager(BaseUserManager):
         return self._create_user(email, name, password, **extra_fields)
 
 
-class Customer(AbstractUser):
-    """Customer model extending Django's user with email as username."""
+class User(AbstractUser):
+    """Abstract base model for application users."""
 
     username = None
     first_name = None
@@ -51,8 +53,15 @@ class Customer(AbstractUser):
 
     objects = CustomerManager()
 
+    class Meta:
+        abstract = True
+
     def __str__(self) -> str:
         return self.name
+
+
+class Customer(User):
+    """Concrete user type representing application customers."""
 
 
 class Favorite(models.Model):

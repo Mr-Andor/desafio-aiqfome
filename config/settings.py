@@ -30,7 +30,13 @@ SECRET_KEY = 'django-insecure-7%j+199y%b3)pvf2hl4^x^_o+eqe@p_^vit0jf*qz@e99u#j=)
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+raw_allowed_hosts = os.environ.get('DJANGO_ALLOWED_HOSTS', '')
+if raw_allowed_hosts:
+    ALLOWED_HOSTS = [host.strip() for host in raw_allowed_hosts.split(',') if host.strip()]
+else:
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+    if DEBUG:
+        ALLOWED_HOSTS.append('0.0.0.0')
 
 
 # Application definition
@@ -42,6 +48,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
+    'drf_spectacular',
+    'catalog',
     'user',
 ]
 
@@ -82,11 +91,22 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.environ.get('DB_NAME', 'desafio_aiqfome'),
-        'USER': os.environ.get('DB_USER', 'Gandalf'),
-        'PASSWORD': os.environ.get('DB_PASSWORD', 'Mellon'),
+        'USER': os.environ.get('DB_USER', 'postgres'),
+        'PASSWORD': os.environ.get('DB_PASSWORD', ''),
         'HOST': os.environ.get('DB_HOST', 'localhost'),
         'PORT': os.environ.get('DB_PORT', '5432')
     }
+}
+
+
+ELASTICSEARCH = {
+    'cloud_id': os.environ.get('ES_CLOUD_ID') or None,
+    'api_key': os.environ.get('ES_API_KEY') or None,
+    'username': os.environ.get('ES_USERNAME') or None,
+    'password': os.environ.get('ES_PASSWORD') or None,
+    'hosts': os.environ.get('ES_HOSTS') or os.environ.get('ES_HOST') or 'http://localhost:9200',
+    'index': os.environ.get('ES_PRODUCTS_INDEX', 'products'),
+    'search_size': int(os.environ.get('ES_SEARCH_SIZE', '50')),
 }
 
 
@@ -132,3 +152,30 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 AUTH_USER_MODEL = 'user.Customer'
+
+REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'desafio-aiqfome API',
+    'DESCRIPTION': 'API for managing customers and their favorite products.',
+    'VERSION': '1.0.0',
+    'COMPONENTS': {
+        'securitySchemes': {
+            'BearerAuth': {
+                'type': 'http',
+                'scheme': 'bearer',
+                'bearerFormat': 'JWT',
+            },
+        },
+    },
+    'SECURITY': [{'BearerAuth': []}],
+    'SERVE_INCLUDE_SCHEMA': False,
+}

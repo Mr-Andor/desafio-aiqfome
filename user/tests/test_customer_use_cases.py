@@ -18,22 +18,25 @@ class CustomerUseCaseTests(TestCase):
 
     def test_create_customer_returns_dto(self):
         customer = self.create_use_case.execute(
-            name="Luke Skywalker",
-            email="luke@rebellion.example",
+            name="Elminster Aumar",
+            email="elminster@candlekeep.example",
+            password="mystra123",
         )
 
         self.assertIsNotNone(customer.id)
-        self.assertEqual(customer.name, "Luke Skywalker")
-        self.assertEqual(customer.email, "luke@rebellion.example")
+        self.assertEqual(customer.name, "Elminster Aumar")
+        self.assertEqual(customer.email, "elminster@candlekeep.example")
 
     def test_list_customers_returns_all_customers(self):
         self.create_use_case.execute(
-            name="Leia Organa",
-            email="leia@rebellion.example",
+            name="Laeral Silverhand",
+            email="laeral@waterdeep.example",
+            password="harpers123",
         )
         self.create_use_case.execute(
-            name="Han Solo",
-            email="han@falcon.example",
+            name="Bruenor Battlehammer",
+            email="bruenor@mithral.example",
+            password="forge123",
         )
 
         customers = ListCustomers(self.repository).execute()
@@ -41,20 +44,21 @@ class CustomerUseCaseTests(TestCase):
         self.assertEqual(len(customers), 2)
         self.assertEqual(
             sorted(customer.email for customer in customers),
-            ["han@falcon.example", "leia@rebellion.example"],
+            ["bruenor@mithral.example", "laeral@waterdeep.example"],
         )
 
     def test_get_customer_returns_matching_customer(self):
         created = self.create_use_case.execute(
-            name="Rey Skywalker",
-            email="rey@jedi.example",
+            name="Drizzt DoUrden",
+            email="drizzt@faerun.example",
+            password="panther123",
         )
 
         found = GetCustomer(self.repository).execute(created.id)
 
         self.assertEqual(found.id, created.id)
-        self.assertEqual(found.name, "Rey Skywalker")
-        self.assertEqual(found.email, "rey@jedi.example")
+        self.assertEqual(found.name, "Drizzt DoUrden")
+        self.assertEqual(found.email, "drizzt@faerun.example")
 
     def test_get_customer_raises_when_not_found(self):
         with self.assertRaises(CustomerNotFoundError):
@@ -62,23 +66,25 @@ class CustomerUseCaseTests(TestCase):
 
     def test_update_customer_changes_persisted_fields(self):
         created = self.create_use_case.execute(
-            name="Finn",
-            email="finn@resistance.example",
+            name="Jarlaxle Baenre",
+            email="jarlaxle@bregandarthe.example",
+            password="hat123",
         )
 
         updated = UpdateCustomer(self.repository).execute(
             customer_id=created.id,
-            name="FN-2187",
-            email="fn2187@resistance.example",
+            name="Captain Jarlaxle",
+            email="jarlaxle@luskan.example",
         )
 
-        self.assertEqual(updated.name, "FN-2187")
-        self.assertEqual(updated.email, "fn2187@resistance.example")
+        self.assertEqual(updated.name, "Captain Jarlaxle")
+        self.assertEqual(updated.email, "jarlaxle@luskan.example")
 
     def test_delete_customer_removes_record(self):
         created = self.create_use_case.execute(
-            name="Poe Dameron",
-            email="poe@resistance.example",
+            name="Catti-brie",
+            email="catti@silverymoon.example",
+            password="bow123",
         )
 
         DeleteCustomer(self.repository).execute(customer_id=created.id)
