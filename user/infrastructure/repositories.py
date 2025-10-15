@@ -26,11 +26,11 @@ class DjangoCustomerRepository(CustomerRepository):
     def _to_dto(self, instance) -> CustomerDTO:
         return CustomerDTO(id=instance.id, name=instance.name, email=instance.email)
 
-    def create(self, *, name: str, email: str) -> CustomerDTO:
+    def create(self, *, name: str, email: str, password: str) -> CustomerDTO:
         instance = self._model.objects.create_user(
             name=name,
             email=email,
-            password=None,
+            password=password,
         )
         return self._to_dto(instance)
 

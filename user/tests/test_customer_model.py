@@ -6,24 +6,24 @@ from django.test import TestCase
 class CustomerModelTests(TestCase):
     def test_customer_str_returns_name(self):
         customer = get_user_model().objects.create_user(
-            name="Leia Organa",
-            email="leia@rebellion.example",
-            password="secret123",
+            name="Viconia DeVir",
+            email="viconia@baldursgate.example",
+            password="shadow123",
         )
 
-        self.assertEqual(str(customer), "Leia Organa")
+        self.assertEqual(str(customer), "Viconia DeVir")
 
     def test_customer_email_must_be_unique(self):
         user_model = get_user_model()
         user_model.objects.create_user(
-            name="Han Solo",
-            email="han@falcon.example",
-            password="secret123",
+            name="Minsc",
+            email="minsc@rashemen.example",
+            password="hamster123",
         )
 
         with self.assertRaises(IntegrityError):
             user_model.objects.create_user(
-                name="Another Han",
-                email="han@falcon.example",
-                password="secret456",
+                name="Another Minsc",
+                email="minsc@rashemen.example",
+                password="hamster456",
             )

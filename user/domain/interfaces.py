@@ -9,7 +9,7 @@ from .entities import CustomerDTO, FavoriteDTO
 class CustomerRepository(Protocol):
     """Repository abstraction for Customer persistence."""
 
-    def create(self, *, name: str, email: str) -> CustomerDTO:
+    def create(self, *, name: str, email: str, password: str) -> CustomerDTO:
         ...
 
     def list(self) -> Sequence[CustomerDTO]:

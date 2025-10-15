@@ -8,9 +8,9 @@ from user.models import Favorite
 class FavoriteModelTests(TestCase):
     def setUp(self):
         self.customer = get_user_model().objects.create_user(
-            name="Mon Mothma",
-            email="mon@rebellion.example",
-            password="secret123",
+            name="Lidda Swiftfoot",
+            email="lidda@adventurers.example",
+            password="stealth123",
         )
 
     def test_can_create_favorite_for_customer(self):
