@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'catalog',
     'user',
 ]
 
@@ -82,11 +83,22 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.environ.get('DB_NAME', 'desafio_aiqfome'),
-        'USER': os.environ.get('DB_USER', 'Gandalf'),
-        'PASSWORD': os.environ.get('DB_PASSWORD', 'Mellon'),
+        'USER': os.environ.get('DB_USER', 'postgres'),
+        'PASSWORD': os.environ.get('DB_PASSWORD', ''),
         'HOST': os.environ.get('DB_HOST', 'localhost'),
         'PORT': os.environ.get('DB_PORT', '5432')
     }
+}
+
+
+ELASTICSEARCH = {
+    'cloud_id': os.environ.get('ES_CLOUD_ID') or None,
+    'api_key': os.environ.get('ES_API_KEY') or None,
+    'username': os.environ.get('ES_USERNAME') or None,
+    'password': os.environ.get('ES_PASSWORD') or None,
+    'hosts': os.environ.get('ES_HOSTS') or os.environ.get('ES_HOST') or 'http://localhost:9200',
+    'index': os.environ.get('ES_PRODUCTS_INDEX', 'products'),
+    'search_size': int(os.environ.get('ES_SEARCH_SIZE', '50')),
 }
 
 
