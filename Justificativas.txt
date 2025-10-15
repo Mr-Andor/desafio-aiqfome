@@ -5,8 +5,8 @@ sugere que ele precise ser escalável, modular e padronizado.
 
 Partir de uma abordagem mais "pythonesca" utilizando o modelo MTV, mais comum em Django, poderia ter sido mais simples mas eu acredito que uma abordagem
 mais centrada no DDD acaba criando um produto mais estável e modular. Durante o desenvolvimento eu me coloquei no papel de um desenvolvedor que está
-integrando este sistema de forma de longo-prazo dentro de uma aplicação corpoorativa maior. Em um caso como esse penso
-fazer mais sentido ter uma separação mais clara dos componentes, um isolamento da lógica de negócio da integração e do componentes externos, 
+integrando este sistema de forma de longo-prazo dentro de uma aplicação corporativa maior. Em um caso como esse penso
+fazer mais sentido ter uma separação mais clara dos componentes, um isolamento da lógica de negócio da integração e dos componentes externos, 
 uma maior facilidade na geração e cobertura de testes. Enfim, basicamente uma abordagem mais resiliente a mudanças a longo prazo.
 
 Por que essa stack?
