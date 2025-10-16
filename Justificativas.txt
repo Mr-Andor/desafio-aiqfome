@@ -2,18 +2,18 @@ Por que esta arquitetura?
 Escolhi partir de uma estrutura de clean architecture considerando que, na descrição do email, 
 foi mencionado a necessidade do sistema desenvolvido se integrado a outros sistemas internos e externos. Essa necessidade funcional
 sugere que ele precise ser escalável, modular e padronizado.
-
-Por que o código está em inglês?
-Padronização. Algumas bibliotecas podem ter problemas com caracteres especiais de português, a línguagem da sintaxe das linguagens já é feita em inglês,
-e, além disso, não tem como saber que pessoas irão realizar manutenção de código. Em um ambiente de cooperação internacional acho importante manter tudo na lingua franca
-que outros desenvolvedores provavelmente já conhecem. 
-
+ 
 Partir de uma abordagem mais "pythonesca" utilizando o modelo MTV, mais comum em Django, poderia ter sido mais simples mas eu acredito que uma abordagem
 mais centrada no DDD acaba criando um produto mais estável e modular. Durante o desenvolvimento eu me coloquei no papel de um desenvolvedor que está
 integrando este sistema de forma de longo-prazo dentro de uma aplicação corporativa maior. Em um caso como esse penso
 fazer mais sentido ter uma separação mais clara dos componentes, um isolamento da lógica de negócio da integração e dos componentes externos, 
 uma maior facilidade na geração e cobertura de testes. Enfim, basicamente uma abordagem mais resiliente a mudanças a longo prazo.
-
+-----------------------------------
+Por que o código está em inglês?
+Padronização. Algumas bibliotecas podem ter problemas com caracteres especiais de português, a línguagem da sintaxe das linguagens já é feita em inglês,
+e, além disso, não tem como saber que pessoas irão realizar manutenção de código. Em um ambiente de cooperação internacional acho importante manter tudo na lingua franca
+que outros desenvolvedores provavelmente já conhecem.
+-----------------------------------
 Por que essa stack?
 Em poucas palavras, familiaridade. Eu atuei mais com python e django nos últimos anos e, embora também esteja programando em kotlin agora,
 ainda me sinto mais à vontade para programar em python mesmo que a arquitetura escolhida fizesse mais sentido, até mesmo em questão de performance,
@@ -21,26 +21,27 @@ se utilizasse algo como o kotlin, java ou C#.
 
 Considerei o prazo e o tempo que teria disponível, então optei pela escolha que acredito que me faria fazer o produto mais completo que posso em tempo
 hábil.
-
+-----------------------------------
 E quanto ao ElasticSearch?
 Ele não estava na lista de demandas, mas eu recentemente comecei um curso no Udemy sobre o assunto e quando vi o tema do desafio, pensei: Por que não?
 Dei uma olhada na API da fakestore e achei que dava pra colocar aqui uma ferramenta de busca que fizesse sentido com o tema do desafio sem fugir
 da proposta dele. :)
-
+-----------------------------------
 Pra que 3 branches dentro do GitHub?
 É um espelho do ambiente de trabalho em que costumo desenvolver. Como disse antes, eu tentei me colocar no papel de um desenvolvedor dentro de um time maior
 aqui. Eu só não pedi reviews porque pedir review para eu mesmo aprovar seria um pouco demais já! Mas a ideia era de copiar o máximo possível o ambiente
 de desenvolvimento dentro do git: eu subo um PR puxado a partir da branch de Dev, subo features para essa branch e então ela percorre até Staging, que seria
 onde os testes de uso em QA seriam feitos para então subir para uma produção ou pré-produção na Main.
-
+-----------------------------------
 E quanto ao CI?
 Mesma justificativa anterior: eu tentei emular um ambiente de desenvolvimento mais realista então eu programei uma action no github para rodar os testes
 no github antes do commits de dev para staging para preservar as branches.
-
+-----------------------------------
 E o Docker?
 Mais simples de compartilhar o ambiente do projeto dessa forma. Também me poupa de ter que subir o Postgre manualmente se eu coloco ele dentro de uma imagem
 no docker e se eu já fiz isso pro DB, já faço logo para o projeto como um todo.
-
+-----------------------------------
 E os testes?
 Não foi mencionado no email, mas eu busquei desenvolver por TDD sempre que possível. Tanto acho uma boa prática fazer a cobertura de testes das funções
 quanto acho que facilita para documentar e ir validando o que escrevi.
+-----------------------------------
